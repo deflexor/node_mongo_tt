@@ -18,22 +18,7 @@ async function main() {
   const db = client.db(dbName);
   await loadJSONFiles(db);
   // Task part 3, aggregate coords
-  const $coordsAgg = await db.collection(col1).aggregate([
-    {
-      $project: {
-        country: 1,
-        lng: { $arrayElemAt: ['$location.ll', 0] },
-        lat: { $arrayElemAt: ['$location.ll', 1] },
-      },
-    },
-    { $group: { _id: '$country', longitude: { $push: '$lng' }, latitude: { $push: '$lat' } } },
-  ]).toArray();
-  const coordsByCountry = new Map();
-  $coordsAgg.forEach((row) => {
-    coordsByCountry[row._id] = { latitude: row.latitude, longitude: row.longitude };
-  });
-  // Task part 4, students difference
-  const $sdiffAgg = await db.collection(col1).aggregate([
+  const $agg = await db.collection(col1).aggregate([
     {
       $lookup:
       {
@@ -42,14 +27,25 @@ async function main() {
         foreignField: 'country',
         as: 'col2',
       },
+    },    
+    {
+      $project: {
+        country: 1,
+        lng: { $arrayElemAt: ['$location.ll', 0] },
+        lat: { $arrayElemAt: ['$location.ll', 1] },
+        students: 1,
+        col2: 1,
+      },
     },
-    { $project: { country: 1, students: 1, col2: 1 } },
     {
       $group:
        {
          _id: '$country',
          col2: { $first: '$col2.overallStudents' },
          detStudents: { $sum: { $sum: '$students.number' } },
+         longitude: { $push: '$lng' },
+         latitude: { $push: '$lat' },
+         count: { $sum: 1 }
        },
     },
     {
@@ -57,28 +53,19 @@ async function main() {
         diffStundents: { $subtract: ['$detStudents', { $first: '$col2' }] },
       },
     },
+    {
+      $project: {
+        country: 1,
+        longitude: 1,
+        latitude: 1,
+        count: 1,
+        diffStundents: 1,
+      },
+    },
   ]).toArray();
-  // Task part 5: Find documents count by countries
-  const $docsAgg = await db.collection(col1).aggregate([
-    { $group: { _id: '$country', count: { $sum: 1 } } },
-    { $sort: { count: -1 } },
-  ]).toArray();
-  const countByCountry = new Map();
-  $docsAgg.forEach((row) => {
-    countByCountry[row._id] = row.count;
-  });
-  //  console.log($coordsAgg);
-  // Task 6: Write result to third collection to the current database
-  const result = $coordsAgg.map((row) => ({
-    _id: row._id,
-    allDiffs: $sdiffAgg,
-    count: countByCountry[row._id],
-    longitude: coordsByCountry[row._id].longitude,
-    latitude: coordsByCountry[row._id].latitude,
-  }));
-  // console.log(result)
+
   await db.collection(col3).drop();
-  await db.collection(col3).insertMany(result);
+  await db.collection(col3).insertMany($agg);
   return 'done.';
 }
 
