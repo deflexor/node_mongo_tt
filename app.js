@@ -62,10 +62,11 @@ async function main() {
         diffStundents: 1,
       },
     },
-  ]).toArray();
+    {
+      $out: col3
+    }
+  ]);
 
-  await db.collection(col3).drop();
-  await db.collection(col3).insertMany($agg);
   return 'done.';
 }
 
