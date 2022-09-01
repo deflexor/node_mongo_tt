@@ -4,8 +4,8 @@ import { exit } from 'process';
 
 dotenv.config();
 
-const colDetailsName = process.env.COLLECTION1_NAME
-const colSummaryName = process.env.COLLECTION2_NAME
+const colDetailsName = process.env.COLLECTION1_NAME;
+const colSummaryName = process.env.COLLECTION2_NAME;
 
 function idF(x) {
   return x;
